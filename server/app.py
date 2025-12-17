@@ -1,4 +1,4 @@
-from flask import Flask, session, request, jsonify, redirect, url_for
+from flask import Flask, session, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import desc
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,23 +10,23 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
 db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+current_rooms = {}
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
-    profile_picture = db.Column(db.String(255), nullable=True)
 
 class Chat(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=True)
-    recipients = db.Column(db.Text, nullable=True)
+    name = db.Column(db.String(100), nullable=False)
+    recipients = db.Column(db.Text, nullable=False) 
 
 class ChatMember(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user = db.relationship('User')
-    typing = db.Column(db.Boolean, default=False)
     read = db.Column(db.Boolean, default=False)
 
 class Message(db.Model):
@@ -55,7 +55,7 @@ def register():
     db.session.add(user)
     db.session.commit()
     session['user_id'] = user.id
-    return redirect(url_for('chats'))
+    return jsonify({'success': True, 'user_id': user.id, 'message': 'Registered successfully'}), 201
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -91,7 +91,7 @@ def chat(chat_id):
         })
     return jsonify(messages_list)
 
-@app.route('/chats', methods=['GET'])
+@app.route('/chats/<int:user_id>', methods=['GET'])
 def chats():
     if not session.get('user_id'):
         return jsonify({'error': 'Unauthorized'}), 401
@@ -191,12 +191,27 @@ def send_message():
 @socketio.on('join_chat')
 def handle_join_chat(data):
     chat_id = data['chat_id']
+    sid = request.sid
+    # Leave previous room if any
+    if sid in current_rooms:
+        leave_room(str(current_rooms[sid]))
     join_room(str(chat_id))
+    current_rooms[sid] = chat_id
 
 @socketio.on('leave_chat')
 def handle_leave_chat(data):
     chat_id = data['chat_id']
+    sid = request.sid
     leave_room(str(chat_id))
+    if sid in current_rooms and current_rooms[sid] == chat_id:
+        del current_rooms[sid]
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    sid = request.sid
+    if sid in current_rooms:
+        leave_room(str(current_rooms[sid]))
+        del current_rooms[sid]
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

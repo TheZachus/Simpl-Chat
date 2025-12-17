@@ -7,6 +7,8 @@ const socket = io('http://localhost:5000')
 function App() {
   const [user, setUser] = useState(null)
   const [loginData, setLoginData] = useState({ username: '', password: '' })
+  const [registerData, setRegisterData] = useState({ username: '', password: '' })
+  const [isRegistering, setIsRegistering] = useState(false)
   const [chats, setChats] = useState([])
   const [currentChat, setCurrentChat] = useState(null)
   const [messages, setMessages] = useState([])
@@ -44,6 +46,26 @@ function App() {
     }
   }
 
+  const handleRegister = async (e) => {
+    e.preventDefault()
+    try {
+      const response = await fetch('http://localhost:5000/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registerData)
+      })
+      const data = await response.json()
+      if (data.success) {
+        setUser({ username: registerData.username })
+        fetchChats()
+      } else {
+        alert(data.message)
+      }
+    } catch (error) {
+      console.error('Register error:', error)
+    }
+  }
+
   const fetchChats = async () => {
     try {
       const response = await fetch('http://localhost:5000/chats')
@@ -55,6 +77,10 @@ function App() {
   }
 
   const selectChat = async (chat) => {
+    // Leave the previous room if already in one
+    if (currentChat) {
+      socket.emit('leave_chat', { chat_id: currentChat.id })
+    }
     setCurrentChat(chat)
     try {
       const response = await fetch(`http://localhost:5000/chat/${chat.id}`)
@@ -87,28 +113,55 @@ function App() {
   }
 
   if (!user) {
-    return (
-      <div className="login">
-        <h1>Login</h1>
-        <form onSubmit={handleLogin}>
-          <input
-            type="text"
-            placeholder="Username"
-            value={loginData.username}
-            onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={loginData.password}
-            onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-            required
-          />
-          <button type="submit">Login</button>
-        </form>
-      </div>
-    )
+    if (isRegistering) {
+      return (
+        <div className="register">
+          <h1>Register</h1>
+          <form onSubmit={handleRegister}>
+            <input
+              type="text"
+              placeholder="Username"
+              value={registerData.username}
+              onChange={(e) => setRegisterData({ ...registerData, username: e.target.value })}
+              required
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={registerData.password}
+              onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+              required
+            />
+            <button type="submit">Register</button>
+          </form>
+          <button type="button" onClick={() => setIsRegistering(false)}>Already have an account? Login</button>
+        </div>
+      )
+    } else {
+      return (
+        <div className="login">
+          <h1>Login</h1>
+          <form onSubmit={handleLogin}>
+            <input
+              type="text"
+              placeholder="Username"
+              value={loginData.username}
+              onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
+              required
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={loginData.password}
+              onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+              required
+            />
+            <button type="submit">Login</button>
+          </form>
+          <button type="button" onClick={() => setIsRegistering(true)}>Not a user yet? Register</button>
+        </div>
+      )
+    }
   }
 
   return (
