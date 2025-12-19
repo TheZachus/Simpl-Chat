@@ -37,7 +37,7 @@ function App() {
       const data = await response.json()
       if (data.success) {
         setUser({ username: loginData.username })
-        fetchChats()
+        fetchChats(loginData.user_id)
       } else {
         alert(data.message)
       }
@@ -57,7 +57,7 @@ function App() {
       const data = await response.json()
       if (data.success) {
         setUser({ username: registerData.username })
-        fetchChats()
+        fetchChats(registerData.user_id)
       } else {
         alert(data.message)
       }
@@ -66,15 +66,23 @@ function App() {
     }
   }
 
-  const fetchChats = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/chats')
-      const data = await response.json()
-      setChats(data)
-    } catch (error) {
-      console.error('Fetch chats error:', error)
-    }
+const fetchChats = async () => {
+  try {
+    const response = await fetch('http://localhost:5000/chats', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      // Required if frontend is on localhost:3000 and backend on :5000
+      credentials: 'include' 
+    });
+    
+    if (!response.ok) throw new Error('Unauthorized or Server Error');
+    
+    const data = await response.json();
+    setChats(data);
+  } catch (error) {
+    console.error('Fetch chats error:', error);
   }
+}
 
   const selectChat = async (chat) => {
     // Leave the previous room if already in one

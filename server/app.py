@@ -1,12 +1,14 @@
 from flask import Flask, session, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import desc
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_cors import CORS
 import random
 
 app = Flask(__name__)
+CORS(app, origins=["http://localhost:5173"])
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
+app.secret_key = 'your_secret_key_here'
 db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -65,7 +67,7 @@ def login():
     user = User.query.filter_by(username=username).first()
     if user and check_password_hash(user.password, password):
         session['user_id'] = user.id
-        return jsonify({'success': True, 'message': 'Logged in successfully'})
+        return jsonify({'success': True, 'user_id': user.id, 'message': 'Logged in successfully'})
     else:
         return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
 
@@ -85,44 +87,46 @@ def chat(chat_id):
             'id': msg.id,
             'user_id': msg.user_id,
             'username': user.username,
-            'profile_picture': user.profile_picture,
             'message': msg.message,
             'timestamp': msg.timestamp.isoformat() if msg.timestamp else None
         })
     return jsonify(messages_list)
 
-@app.route('/chats/<int:user_id>', methods=['GET'])
-def chats():
-    if not session.get('user_id'):
+@app.route('/api/chats', methods=['GET'])
+def get_chats():
+    current_user_id = session.get('user_id')
+    if not current_user_id:
         return jsonify({'error': 'Unauthorized'}), 401
-    all_chats = Chat.query.all()
-    chats_query = [chat for chat in all_chats if str(session['user_id']) in chat.recipients.split(',')]
+
+    # Filter chats where current_user_id is in the recipients string
+    # Note: Storing IDs as a CSV string is non-relational; consider a Many-to-Many table.
+    chats_query = Chat.query.filter(Chat.recipients.contains(str(current_user_id))).all()
+    
     chat_list = []
     for chat in chats_query:
-        latest_msg = Message.query.filter_by(chat_id=chat.id).order_by(desc(Message.timestamp)).first()
-        if chat.name:
+        latest_msg = Message.query.filter_by(chat_id=chat.id).order_by(Message.timestamp.desc()).first()
+        
+        # Determine Chat Name
+        if not chat.name:
+            recipient_ids = [int(x) for x in chat.recipients.split(',') if x.strip()]
+            other_users = User.query.filter(User.id.in_(recipient_ids), User.id != current_user_id).all()
+            chat_name = ', '.join([u.username for u in other_users])
+        else:
             chat_name = chat.name
-        else:
-            user_ids = [int(x.strip()) for x in chat.recipients.split(',') if x.strip()]
-            other_users = [User.query.get(uid).username for uid in user_ids if uid != session['user_id']]
-            chat_name = ', '.join(other_users)
-        chat_data = {'id': chat.id, 'name': chat_name, 'recipients': chat.recipients}
-        if latest_msg:
-            user = User.query.get(latest_msg.user_id)
-            chat_data['latest_message'] = {
-                'id': latest_msg.id,
-                'user_id': latest_msg.user_id,
-                'username': user.username,
-                'profile_picture': user.profile_picture,
-                'message': latest_msg.message,
-                'timestamp': latest_msg.timestamp.isoformat() if latest_msg.timestamp else None
+
+        chat_data = {
+            'id': chat.id,
+            'name': chat_name,
+            'latest_message': {
+                'message': latest_msg.message if latest_msg else 'Empty chat',
+                'username': User.query.get(latest_msg.user_id).username if latest_msg else None,
+                'timestamp': latest_msg.timestamp.isoformat() if latest_msg and latest_msg.timestamp else None
             }
-        else:
-            chat_data['latest_message'] = {
-                'message': '(This chat is empty for now. Get the conversation going!)'
-            }
-    #returns the list of chats with latest messages
+        }
+        chat_list.append(chat_data)
+
     return jsonify(chat_list)
+
 
 @app.route('/create_chat', methods=['POST'])
 def create_chat():
@@ -180,7 +184,6 @@ def send_message():
         'chat_id': chat_id,
         'user_id': new_message.user_id,
         'username': User.query.get(new_message.user_id).username,
-        'profile_picture': User.query.get(new_message.user_id).profile_picture,
         'message': new_message.message,
         'timestamp': new_message.timestamp.isoformat() if new_message.timestamp else None
     }
