@@ -1,14 +1,11 @@
-from flask import Flask, session, request, jsonify
+from flask import Flask, session, request, jsonify, render_template, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from flask_cors import CORS
 import random
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"])
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///chat.db'
-app.secret_key = 'your_secret_key_here'
 db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -40,6 +37,11 @@ class Message(db.Model):
 
 with app.app_context():
     db.create_all()
+
+@app.route('/')
+def index():
+    # Pass any context or variables to the template
+    return render_template('index.html', title="Simple Chat")
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -92,7 +94,7 @@ def chat(chat_id):
         })
     return jsonify(messages_list)
 
-@app.route('/api/chats', methods=['GET'])
+@app.route('/chats', methods=['GET'])
 def get_chats():
     current_user_id = session.get('user_id')
     if not current_user_id:
@@ -101,6 +103,9 @@ def get_chats():
     # Filter chats where current_user_id is in the recipients string
     # Note: Storing IDs as a CSV string is non-relational; consider a Many-to-Many table.
     chats_query = Chat.query.filter(Chat.recipients.contains(str(current_user_id))).all()
+
+    if chats_query is None:
+        return jsonify([])
     
     chat_list = []
     for chat in chats_query:
