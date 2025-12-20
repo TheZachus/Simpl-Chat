@@ -7,7 +7,10 @@ const Button (title, redirect) {
 };
 
 const InputBar () {
-    return <div>Input Bar Component</div>;
+    return <form>
+    <input type="text" placeholder="Type a message..." />
+    <button type="submit">Send</button>
+    </form>>;
 }
 
 const SearchBar () {
@@ -19,3 +22,7 @@ const ChatList () {
 };
 
 export { Message, Button, InputBar, SearchBar, ChatList };
+
+ChatEmissionListeners () {
+ return <div>Chat Emission Listeners Component</div>;
+};
