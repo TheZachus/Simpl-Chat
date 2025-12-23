@@ -1,0 +1,65 @@
+/* Button Styles */
+button {
+    transition: all 0.3s ease;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+/* Animation keyframes */
+@keyframes fadeInUp {
+
+    /* The starting state (0% or 'from') */
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+        /* Starts slightly below its final position */
+    }
+
+    /* The ending state (100% or 'to') */
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        /* Ends at its original position */
+    }
+}
+
+/* Index page specific styles */
+#root h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    animation: fadeInUp 1s ease-out forwards;
+}
+
+#root h2 {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    color: #666;
+    animation: fadeInUp 1.5s ease-out forwards;
+    opacity: 0;
+    /* Start invisible for animation */
+}
+
+/* Anchor/Link Styles */
+#root a {
+    cursor: pointer;
+    color: #007bff;
+    text-decoration: underline;
+    transition: color 0.3s ease;
+}
+
+#root a:hover {
+    color: #0056b3;
+}
+
+/* Unread Messages */
+.unread {
+    font-weight: bold;
+    background-color: #e6f7ff;
+}

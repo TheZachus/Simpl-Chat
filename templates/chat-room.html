@@ -1,4 +1,8 @@
 {% extends "layout.html"%} {% block content %}
 <h1>Welcome to Simpl Chat</h1>
-<p>This is a chat room specifically for .</p>
+<p>This is a chat room specifically for connecting to a chatroom. </p>
+
+var socket = io(); socket.on('connect', function() { 
+    socket.emit('my event',
+{data: 'I\'m connected!'}); });
 {% endblock %}

@@ -1,4 +1,5 @@
 {% extends "layout.html" %} {% block content %}
-<h1>Welcome to Simpl Chat</h1>
-<p>This is the view-chats page.</p>
+<h1>Chats</h1>
+<ChatList list={JSON.parse('{{ chats | tojson | safe }}')} />
+<Button text="Logout" redirect="/logout" />
 {% endblock %}

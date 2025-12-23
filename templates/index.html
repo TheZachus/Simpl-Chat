@@ -1,4 +1,13 @@
 {% extends "layout.html"%} {% block content %}
-<h1>Welcome to Simpl Chat</h1>
-<p>This is the home page.</p>
+{% if message %}
+<div className="text-danger">
+    <p>{{message}}</p>
+</div>
+{% endif %}
+<div className="align-items-center text-center">
+    <h1>Welcome to Simpl Chat</h1>
+    <h2>No BS. Just Chat.</h2>
+    <Button text="Login" redirect="/login" />
+    <Button text="Register" redirect="/register" />
+</div>
 {% endblock %}

@@ -1,0 +1,13 @@
+{% extends "layout.html" %} {% block content %}
+    {% if message %}
+        <div className="text-danger">
+                <p>{{ message }}</p>
+        </div>
+    {% endif %}
+<div className="align-items-center text-center">
+    <h1>Create a Conversation</h1>
+    <Button text="Back to Chats" redirect="/chats" />
+    <Search />
+</div>
+{% endblock %}
+
