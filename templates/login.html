@@ -1,8 +1,11 @@
 {% extends "layout.html" %} {% block content %}
 
+{% if error %}
 <div className="text-danger">
     <p>{{error}}</p>
 </div>
+{% endif %}
+
 <div className="align-items-center text-center">
     <h1>Login</h1>
     <form method="post" action="/login">
