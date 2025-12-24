@@ -1,6 +1,9 @@
-{% extends "layout.html"%} {% block content %}
-<h1>Welcome to Simpl Chat</h1>
-<p>This is a chat room specifically for connecting to a chatroom. </p>
-
-
+{% extends "layout.html"%} 
+{% block content %}
+<Button text="Back to Chats" redirect="/chats" />
+<h1>{{ title }}</h1>
+<ChatRoom 
+    chatId={Number('{{ chat_id }}')} 
+    initialMessages={JSON.parse('{{ messages|tojson|safe }}')} 
+/>
 {% endblock %}

@@ -9,8 +9,8 @@
 <div className="align-items-center text-center">
     <h1>Login</h1>
     <form method="post" action="/login">
-        <input name="username" type="text" placeholder="Username" />
-        <input name="password" type="password" placeholder="Password" />
+        <input name="username" className="form-control" type="text" placeholder="Username" />
+        <input name="password" className="form-control" type="password" placeholder="Password" />
         <button type="submit">Login</button>
     </form>
     <a onClick={() => window.location.href = '/register'}>No Login? Register</a>

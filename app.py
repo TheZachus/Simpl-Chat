@@ -49,6 +49,24 @@ def load_user(user_id):
 with app.app_context():
     db.create_all()
 
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('join_room')
+def handle_join_room(data):
+    room = data.get('room')
+    if room:
+        join_room(room)
+        print(f'User joined room: {room}')
+
+@socketio.on('leave_room')
+def handle_leave_room(data):
+    room = data.get('room')
+    if room:
+        leave_room(room)
+        print(f'User left room: {room}')
+
 @app.route('/')
 def index():
     if not current_user.is_authenticated:
@@ -118,7 +136,7 @@ def chat(chat_id):
             'message': msg.message,
             'timestamp': msg.timestamp.isoformat() if msg.timestamp else None
         })
-    return render_template('chat-room.html', chat_id=chat_id, messages=messages_list)
+    return render_template('chat-room.html', chat_id=chat_id, messages=messages_list, title="Chat Room")
 
 @app.route('/chats', methods=['GET'])
 @login_required
@@ -148,7 +166,7 @@ def get_chats():
             'name': chat_name,
             'read': read_status,
             'latest_message': {
-                'message': latest_msg.message if latest_msg else 'Empty chat',
+                'message': latest_msg.message if latest_msg else 'This chat has no messages yet.',
                 'username': User.query.get(latest_msg.user_id).username if latest_msg else None,
                 'timestamp': latest_msg.timestamp.isoformat() if latest_msg and latest_msg.timestamp else None
             }
@@ -223,17 +241,22 @@ def send_message():
     message = request.form.get('message')
     
     if not chat_id or not message:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'error': 'Chat ID and message required'}), 400
         return redirect(url_for('chat', chat_id=chat_id, error="Chat ID and message required"))
     
     chat = Chat.query.get(chat_id)
     if not chat or str(current_user.id) not in chat.recipients.split(','):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'error': 'Unauthorized'}), 403
         return redirect(url_for('get_chats'))
 
     new_message = Message(chat_id=chat_id, user_id=current_user.id, message=message)
     db.session.add(new_message)
     db.session.commit()
     
-    emit('new_message', {
+    # Emit to all clients in the room
+    socketio.emit('new_message', {
         'id': new_message.id,
         'chat_id': chat_id,
         'user_id': new_message.user_id,
@@ -242,26 +265,52 @@ def send_message():
         'timestamp': new_message.timestamp.isoformat() if new_message.timestamp else None
     }, room=str(chat_id))
     
+    # Return JSON for AJAX requests, redirect for form submissions
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+        return jsonify({
+            'success': True,
+            'message': {
+                'id': new_message.id,
+                'chat_id': chat_id,
+                'user_id': new_message.user_id,
+                'username': User.query.get(new_message.user_id).username,
+                'message': new_message.message,
+                'timestamp': new_message.timestamp.isoformat() if new_message.timestamp else None
+            }
+        })
+    
     return redirect(url_for('chat', chat_id=chat.id))
 
-@socketio.on('join_chat')
+@app.route('/delete_chat', methods=['POST'])
 @login_required
-def handle_join_chat(data):
-    chat_id = data['chat_id']
-    sid = request.sid
-    if sid in current_rooms:
-        leave_room(str(current_rooms[sid]))
-    join_room(str(chat_id))
-    current_rooms[sid] = chat_id
+def delete_chat():
+    chat_id = None
+    if request.is_json:
+        chat_id = request.json.get('chat_id')
+    else:
+        chat_id = request.form.get('chat_id')
 
-@socketio.on('leave_chat')
-@login_required
-def handle_leave_chat(data):
-    chat_id = data['chat_id']
-    sid = request.sid
-    leave_room(str(chat_id))
-    if sid in current_rooms:
-        del current_rooms[sid]
+    if not chat_id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'error': 'Chat ID required'}), 400
+        return redirect(url_for('get_chats'))
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    chat = Chat.query.get(chat_id)
+    if not chat or str(current_user.id) not in chat.recipients.split(','):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'error': 'Unauthorized'}), 403
+        return redirect(url_for('get_chats'))
+
+    # Delete related records first to avoid orphan data
+    Message.query.filter_by(chat_id=chat_id).delete()
+    ChatMember.query.filter_by(chat_id=chat_id).delete()
+    db.session.delete(chat)
+    db.session.commit()
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+        return jsonify({'success': True})
+
+    return redirect(url_for('get_chats'))
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True)
